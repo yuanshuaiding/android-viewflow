@@ -124,5 +124,96 @@ Licensed under the [Apache License, Version 2.0](http://www.apache.org/licenses/
 
 ![ViewFlow for Android](https://github.com/pakerfeldt/android-viewflow/raw/master/viewflow-example/screen.png "ViewFlow for Android") &nbsp;&nbsp; ![ViewFlow for Android](https://github.com/pakerfeldt/android-viewflow/raw/master/viewflow-example/screen2.png "ViewFlow for Android")
 
+## utils
+public class AsyncImageLoader {
+	private Map<String, SoftReference<Drawable>> imageCache = new HashMap<String, SoftReference<Drawable>>();
 
+	public Drawable loadDrawable(final String imageUrl,
+			final ImageCallback callback) {
+		if (imageCache.containsKey(imageUrl)) {
+			SoftReference<Drawable> softReference = imageCache.get(imageUrl);
+			if (softReference.get() != null) {
+				return softReference.get();
+			}
+		}
+		final Handler handler = new Handler() {
+			@Override
+			public void handleMessage(Message msg) {
+				callback.imageLoaded((Drawable) msg.obj);
+			}
+		};
+		new Thread() {
+			public void run() {
+				Drawable drawable = loadImageFromUrl(imageUrl);
+				imageCache.put(imageUrl, new SoftReference<Drawable>(drawable));
+				handler.sendMessage(handler.obtainMessage(0, drawable));
+			};
+		}.start();
+		return null;
+	}
+
+	protected Drawable loadImageFromUrl(String imgUrl) {
+		URL myFileUrl = null;
+		Bitmap bitmap = null;
+		if (imgUrl != null && imgUrl.trim() != "") {
+			try {
+				myFileUrl = new URL(imgUrl);
+			} catch (MalformedURLException e) {
+				e.printStackTrace();
+				return null;
+			}
+			try {
+				HttpURLConnection conn = (HttpURLConnection) myFileUrl
+						.openConnection();
+				conn.setDoInput(true);
+				conn.connect();
+				InputStream is = conn.getInputStream();
+
+				// xinff
+
+				int length = (int) conn.getContentLength();
+
+				if (length != -1) {
+					byte[] imgData = new byte[length];
+					byte[] temp = new byte[1024];
+					int readLen = 0;
+					int destPos = 0;
+
+					while ((readLen = is.read(temp)) > 0) {
+						System.arraycopy(temp, 0, imgData, destPos, readLen);
+						destPos += readLen;
+					}
+					BitmapFactory.Options options = new BitmapFactory.Options();
+					options.inJustDecodeBounds = true; 
+					Bitmap bm = BitmapFactory.decodeByteArray(imgData, 0, destPos,
+							options);
+					options.inJustDecodeBounds = false;
+					int be = options.outHeight / 200;
+					if (be <= 0) {
+						be = 2;
+					}
+					options.inSampleSize = be;
+					bitmap = BitmapFactory.decodeByteArray(imgData, 0, destPos,
+							options);
+				}
+
+				is.close();
+			} catch (Exception e) {
+				e.printStackTrace();
+				System.out.println(e.getMessage());
+				return null;
+			}
+			// Bitmap2Drawable
+			Drawable d = new BitmapDrawable(bitmap);
+			return d;
+		}
+		return null;
+	}
+
+
+	public interface ImageCallback {
+		public void imageLoaded(Drawable imageDrawable);
+	}
+
+}
 
